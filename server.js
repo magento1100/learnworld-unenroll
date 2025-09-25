@@ -3,7 +3,7 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const helmet = require('helmet');
-const { shopifyConfig, Shop, WebhookEvent, sequelize } = require('./config');
+const { shopifyConfig, Shop, WebhookEvent } = require('./config');
 const WebhookHandler = require('./webhookHandler');
 const LearnWorldsAPI = require('./learnworlds');
 
@@ -18,14 +18,12 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Initialize database
-async function initializeDatabase() {
+// Initialize storage (no-op for in-memory store)
+async function initializeStorage() {
   try {
-    await sequelize.authenticate();
-    await sequelize.sync();
-    console.log('Database connected and synchronized');
+    console.log('In-memory storage initialized');
   } catch (error) {
-    console.error('Database connection failed:', error);
+    console.error('Storage initialization failed:', error);
     process.exit(1);
   }
 }
@@ -313,7 +311,7 @@ app.use((error, req, res, next) => {
 
 // Start server
 async function startServer() {
-  await initializeDatabase();
+  await initializeStorage();
   
   app.listen(PORT, () => {
     console.log(`🚀 Shopify-LearnWorlds Integration Server running on port ${PORT}`);

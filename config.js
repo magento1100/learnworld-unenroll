@@ -17,29 +17,65 @@ const learnworldsConfig = {
   authToken: process.env.LEARNWORLDS_AUTH_TOKEN
 };
 
-// Database configuration (using Sequelize)
-const { Sequelize } = require('sequelize');
-
-let sequelize;
-
-if (process.env.DATABASE_URL) {
-  // Production database (PostgreSQL, MySQL, etc.)
-  sequelize = new Sequelize(process.env.DATABASE_URL);
-} else if (process.env.NODE_ENV === 'production') {
-  // Production fallback - use in-memory SQLite for serverless
-  sequelize = new Sequelize({
-    dialect: 'sqlite',
-    storage: ':memory:',
-    logging: false
-  });
-} else {
-  // Development - use file-based SQLite
-  sequelize = new Sequelize({
-    dialect: 'sqlite',
-    storage: 'database.sqlite',
-    logging: false
-  });
+// Simple in-memory storage for serverless environment
+class InMemoryStore {
+  constructor() {
+    this.shops = new Map();
+    this.webhookEvents = new Map();
+  }
+  
+  // Shop methods
+  async upsertShop(shopData) {
+    this.shops.set(shopData.shop, shopData);
+    return shopData;
+  }
+  
+  async findShop(shop) {
+    return this.shops.get(shop) || null;
+  }
+  
+  // Webhook event methods
+  async createWebhookEvent(eventData) {
+    const id = Date.now().toString();
+    const event = { ...eventData, webhookId: id, createdAt: new Date() };
+    this.webhookEvents.set(id, event);
+    return event;
+  }
+  
+  async findWebhookEvents(query = {}) {
+    const events = Array.from(this.webhookEvents.values());
+    if (query.shop) {
+      return events.filter(e => e.shop === query.shop);
+    }
+    return events;
+  }
 }
+
+const store = new InMemoryStore();
+
+// Mock Sequelize-like interface for compatibility
+const sequelize = {
+  authenticate: async () => true,
+  sync: async () => true,
+  define: () => ({
+    upsert: (data) => store.upsertShop(data),
+    findOne: ({ where }) => store.findShop(where.shop),
+    findAll: ({ where, order, limit } = {}) => store.findWebhookEvents(where)
+  })
+};
+
+// Mock models
+const Shop = {
+  upsert: (data) => store.upsertShop(data),
+  findOne: ({ where }) => store.findShop(where.shop)
+};
+
+const WebhookEvent = {
+  findAll: ({ where, order, limit } = {}) => {
+    const events = store.findWebhookEvents(where);
+    return Promise.resolve(events.slice(0, limit || events.length));
+  }
+};
 
 // Define Shop model for storing shop data
 const Shop = sequelize.define('Shop', {
