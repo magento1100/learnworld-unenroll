@@ -5,9 +5,18 @@ const LearnWorldsAPI = require('./learnworlds');
 class WebhookHandler {
   // Verify Shopify webhook signature
   static verifyWebhookSignature(rawBody, signature, secret) {
+    console.log(`Verifying webhook signature:`);
+    console.log(`  signature: ${signature}`);
+    console.log(`  secret present: ${!!secret}`);
+    console.log(`  body length: ${rawBody.length}`);
+    
     const hmac = crypto.createHmac('sha256', secret);
     hmac.update(rawBody, 'utf8');
     const digest = hmac.digest('base64');
+    
+    console.log(`  computed digest: ${digest}`);
+    console.log(`  signature match: ${digest === signature}`);
+    
     return digest === signature;
   }
 
@@ -125,10 +134,15 @@ class WebhookHandler {
 
   // Process incoming webhook
   static async processWebhook(topic, shop, body, signature, secret) {
+    console.log(`Processing webhook: ${topic} for shop ${shop}`);
+    
     // Verify webhook signature
     if (!this.verifyWebhookSignature(body, signature, secret)) {
+      console.log(`Webhook signature verification failed`);
       throw new Error('Invalid webhook signature');
     }
+    
+    console.log(`Webhook signature verified successfully`);
 
     // Check if webhook was already processed
     const webhookId = crypto.createHash('sha256').update(`${topic}-${shop}-${body}`).digest('hex');

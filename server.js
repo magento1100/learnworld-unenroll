@@ -148,13 +148,35 @@ app.post('/webhooks/orders/:action', async (req, res) => {
       return res.status(400).send('Missing required headers');
     }
 
-    // Get shop configuration
-    const shopConfig = await Shop.findOne({ where: { shop } });
+    // Get shop configuration - use default if not found
+    let shopConfig = await Shop.findOne({ where: { shop } });
+    
     if (!shopConfig) {
-      return res.status(404).send('Shop not found');
+      // Create default shop configuration for testing
+      console.log(`Creating default shop configuration for ${shop}`);
+      shopConfig = {
+        shop: shop,
+        isActive: true,
+        learnworlds: {
+          baseURL: process.env.LEARNWORLDS_API_BASE || 'https://api.learnworlds.com',
+          clientId: process.env.LEARNWORLDS_CLIENT_ID,
+          authToken: process.env.LEARNWORLDS_AUTH_TOKEN
+        },
+        productMapping: {} // Add your product mappings here
+      };
+      
+      // Save the default configuration
+      await Shop.upsert(shopConfig);
     }
 
     // Process webhook
+    console.log(`Calling WebhookHandler.processWebhook with:`);
+    console.log(`  topic: ${topic}`);
+    console.log(`  shop: ${shop}`);
+    console.log(`  body length: ${JSON.stringify(req.body).length}`);
+    console.log(`  signature: ${signature}`);
+    console.log(`  secret: ${process.env.SHOPIFY_API_SECRET ? 'present' : 'missing'}`);
+    
     const result = await WebhookHandler.processWebhook(
       topic,
       shop,
@@ -164,7 +186,12 @@ app.post('/webhooks/orders/:action', async (req, res) => {
     );
 
     console.log(`Webhook processed: ${topic} for shop ${shop}`, result);
-    res.status(200).json({ success: true });
+    res.status(200).json({ 
+      success: true,
+      processed: result.processed,
+      result: result.result || null,
+      reason: result.reason || null
+    });
     
   } catch (error) {
     console.error('Webhook processing error:', error);
