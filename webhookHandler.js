@@ -18,9 +18,11 @@ class WebhookHandler {
       const order = refundData.order;
       
       console.log(`Processing refund for order ${order.id} from shop ${shop}`);
+      console.log(`Refund data:`, JSON.stringify(refundData, null, 2));
 
       // Get shop configuration
       const shopConfig = await Shop.findOne({ where: { shop } });
+      console.log(`Shop config found:`, !!shopConfig, shopConfig ? { shop: shopConfig.shop, isActive: shopConfig.isActive } : 'No config');
       if (!shopConfig || !shopConfig.isActive) {
         throw new Error('Shop not found or inactive');
       }
@@ -34,7 +36,9 @@ class WebhookHandler {
 
       // Process each line item in the order
       const unenrollments = [];
-      for (const lineItem of order.line_items) {
+      console.log(`Processing ${order.line_items?.length || 0} line items for order ${order.id}`);
+      
+      for (const lineItem of order.line_items || []) {
         // Extract product information from line item
         const productId = lineItem.product_id;
         const variantId = lineItem.variant_id;
@@ -47,9 +51,12 @@ class WebhookHandler {
           continue;
         }
 
+        console.log(`Processing line item: productId=${productId}, variantId=${variantId}, quantity=${quantity}, email=${customerEmail}`);
+
         // Map Shopify product to LearnWorlds product
         // This assumes you have a mapping between Shopify products and LearnWorlds products
         const learnWorldsProductId = await this.mapShopifyToLearnWorlds(productId, variantId, shopConfig);
+        console.log(`LearnWorlds product mapping result: ${learnWorldsProductId}`);
         
         if (learnWorldsProductId) {
           unenrollments.push({
@@ -58,11 +65,15 @@ class WebhookHandler {
             productType: 'course', // or 'bundle' based on your mapping
             quantity: quantity
           });
+          console.log(`Added unenrollment: ${customerEmail} from ${learnWorldsProductId}`);
         }
       }
+      
+      console.log(`Total unenrollments to process: ${unenrollments.length}`);
 
       // Process unenrollments
       if (unenrollments.length > 0) {
+        console.log(`Starting unenrollment process for ${unenrollments.length} items`);
         const results = await lwApi.bulkUnenrollUsers(unenrollments);
         console.log(`Processed ${results.length} unenrollments for order ${order.id}`);
         
@@ -121,10 +132,8 @@ class WebhookHandler {
     // You should implement your own mapping logic based on your product structure
     // This could be stored in your database or configuration
     
-    // Example mapping logic:
-    // 1. Check if there's a direct mapping in your database
-    // 2. Use product tags or metafields to store LearnWorlds product IDs
-    // 3. Use product titles or SKUs to match
+    console.log(`Mapping Shopify product ${shopifyProductId}, variant ${shopifyVariantId}`);
+    console.log(`Available mappings:`, JSON.stringify(shopConfig.productMapping, null, 2));
     
     try {
       const shopify = new Shopify.Clients.Rest(shopConfig.shop, shopConfig.accessToken);
@@ -142,7 +151,9 @@ class WebhookHandler {
       );
       
       if (learnWorldsTag) {
-        return learnWorldsTag.trim().split(':')[1];
+        const mappedId = learnWorldsTag.trim().split(':')[1];
+        console.log(`Found product mapping via tag: ${shopifyProductId} -> ${mappedId}`);
+        return mappedId;
       }
       
       // Look for LearnWorlds product ID in metafields
@@ -152,6 +163,7 @@ class WebhookHandler {
         );
         
         if (learnWorldsMetafield) {
+          console.log(`Found product mapping via metafield: ${shopifyProductId} -> ${learnWorldsMetafield.value}`);
           return learnWorldsMetafield.value;
         }
       }
