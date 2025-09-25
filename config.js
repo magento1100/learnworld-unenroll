@@ -77,64 +77,6 @@ const WebhookEvent = {
   }
 };
 
-// Define Shop model for storing shop data
-const Shop = sequelize.define('Shop', {
-  shop: {
-    type: Sequelize.STRING,
-    primaryKey: true,
-  },
-  accessToken: {
-    type: Sequelize.STRING,
-    allowNull: false,
-  },
-  scope: {
-    type: Sequelize.STRING,
-  },
-  learnworldsClientId: {
-    type: Sequelize.STRING,
-  },
-  learnworldsAuthToken: {
-    type: Sequelize.STRING,
-  },
-  learnworldsBaseUrl: {
-    type: Sequelize.STRING,
-  },
-  isActive: {
-    type: Sequelize.BOOLEAN,
-    defaultValue: true,
-  },
-});
-
-// Define Webhook model for tracking processed webhooks
-const WebhookEvent = sequelize.define('WebhookEvent', {
-  webhookId: {
-    type: Sequelize.STRING,
-    primaryKey: true,
-  },
-  shop: {
-    type: Sequelize.STRING,
-    allowNull: false,
-  },
-  topic: {
-    type: Sequelize.STRING,
-    allowNull: false,
-  },
-  orderId: {
-    type: Sequelize.STRING,
-  },
-  processedAt: {
-    type: Sequelize.DATE,
-    defaultValue: Sequelize.NOW,
-  },
-  status: {
-    type: Sequelize.ENUM('pending', 'processing', 'completed', 'failed'),
-    defaultValue: 'pending',
-  },
-  errorMessage: {
-    type: Sequelize.TEXT,
-  },
-});
-
 module.exports = {
   shopifyConfig,
   learnworldsConfig,
