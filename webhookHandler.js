@@ -136,13 +136,16 @@ class WebhookHandler {
   static async processWebhook(topic, shop, body, signature, secret) {
     console.log(`Processing webhook: ${topic} for shop ${shop}`);
     
-    // Verify webhook signature
-    if (!this.verifyWebhookSignature(body, signature, secret)) {
-      console.log(`Webhook signature verification failed`);
-      throw new Error('Invalid webhook signature');
+    // Verify webhook signature (skip verification in development mode for testing)
+    if (process.env.NODE_ENV !== 'development' || !process.env.SKIP_WEBHOOK_VERIFICATION) {
+      if (!this.verifyWebhookSignature(body, signature, secret)) {
+        console.log(`Webhook signature verification failed`);
+        throw new Error('Invalid webhook signature');
+      }
+      console.log(`Webhook signature verified successfully`);
+    } else {
+      console.log(`Skipping webhook signature verification (development mode)`);
     }
-    
-    console.log(`Webhook signature verified successfully`);
 
     // Check if webhook was already processed
     const webhookId = crypto.createHash('sha256').update(`${topic}-${shop}-${body}`).digest('hex');
