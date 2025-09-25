@@ -19,13 +19,27 @@ const learnworldsConfig = {
 
 // Database configuration (using Sequelize)
 const { Sequelize } = require('sequelize');
-const sequelize = process.env.DATABASE_URL 
-  ? new Sequelize(process.env.DATABASE_URL)
-  : new Sequelize({
-      dialect: 'sqlite',
-      storage: 'database.sqlite',
-      logging: false
-    }); // Use SQLite file for development
+
+let sequelize;
+
+if (process.env.DATABASE_URL) {
+  // Production database (PostgreSQL, MySQL, etc.)
+  sequelize = new Sequelize(process.env.DATABASE_URL);
+} else if (process.env.NODE_ENV === 'production') {
+  // Production fallback - use in-memory SQLite for serverless
+  sequelize = new Sequelize({
+    dialect: 'sqlite',
+    storage: ':memory:',
+    logging: false
+  });
+} else {
+  // Development - use file-based SQLite
+  sequelize = new Sequelize({
+    dialect: 'sqlite',
+    storage: 'database.sqlite',
+    logging: false
+  });
+}
 
 // Define Shop model for storing shop data
 const Shop = sequelize.define('Shop', {
