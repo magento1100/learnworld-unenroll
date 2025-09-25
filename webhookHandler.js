@@ -11,7 +11,7 @@ class WebhookHandler {
     return digest === signature;
   }
 
-  // Process order refund webhook
+  // Process order refund webhook - simplified to one API call
   static async handleOrderRefund(topic, shop, body) {
     try {
       const refundData = JSON.parse(body);
@@ -27,80 +27,58 @@ class WebhookHandler {
         throw new Error('Shop not found or inactive');
       }
 
-      // Initialize LearnWorlds API with shop-specific config
-      const lwApi = new LearnWorldsAPI({
-        baseURL: shopConfig.learnworldsBaseUrl,
-        clientId: shopConfig.learnworldsClientId,
-        authToken: shopConfig.learnworldsAuthToken
-      });
+      // Initialize LearnWorlds API
+      const lwApi = new LearnWorldsAPI(shopConfig.learnworlds);
 
-      // Process each line item in the order
-      const unenrollments = [];
-      console.log(`Processing ${order.line_items?.length || 0} line items for order ${order.id}`);
-      
-      for (const lineItem of order.line_items || []) {
-        // Extract product information from line item
-        const productId = lineItem.product_id;
-        const variantId = lineItem.variant_id;
-        const quantity = lineItem.quantity;
-        
-        // Get customer email
-        const customerEmail = order.email || order.customer?.email;
-        if (!customerEmail) {
-          console.warn(`No email found for order ${order.id}`);
-          continue;
-        }
-
-        console.log(`Processing line item: productId=${productId}, variantId=${variantId}, quantity=${quantity}, email=${customerEmail}`);
-
-        // Map Shopify product to LearnWorlds product
-        // This assumes you have a mapping between Shopify products and LearnWorlds products
-        const learnWorldsProductId = await this.mapShopifyToLearnWorlds(productId, variantId, shopConfig);
-        console.log(`LearnWorlds product mapping result: ${learnWorldsProductId}`);
-        
-        if (learnWorldsProductId) {
-          unenrollments.push({
-            email: customerEmail,
-            productId: learnWorldsProductId,
-            productType: 'course', // or 'bundle' based on your mapping
-            quantity: quantity
-          });
-          console.log(`Added unenrollment: ${customerEmail} from ${learnWorldsProductId}`);
-        }
-      }
-      
-      console.log(`Total unenrollments to process: ${unenrollments.length}`);
-
-      // Process unenrollments
-      if (unenrollments.length > 0) {
-        console.log(`Starting unenrollment process for ${unenrollments.length} items`);
-        const results = await lwApi.bulkUnenrollUsers(unenrollments);
-        console.log(`Processed ${results.length} unenrollments for order ${order.id}`);
-        
-        // Log results
-        results.forEach(result => {
-          if (result.success) {
-            console.log(`✓ Unenrolled ${result.email} from product ${result.productId}`);
-          } else {
-            console.error(`✗ Failed to unenroll ${result.email} from product ${result.productId}: ${result.error}`);
-          }
-        });
-
+      // Process the first line item only (simplified approach)
+      const lineItem = order.line_items?.[0];
+      if (!lineItem) {
+        console.log(`No line items found in order ${order.id}`);
         return {
-          success: true,
+          success: false,
           orderId: order.id,
-          processedCount: results.length,
-          results
-        };
-      } else {
-        console.log(`No LearnWorlds products found in order ${order.id}`);
-        return {
-          success: true,
-          orderId: order.id,
-          processedCount: 0,
-          message: 'No LearnWorlds products found'
+          message: 'No line items found in order'
         };
       }
+
+      console.log(`Processing line item: productId=${lineItem.product_id}, variantId=${lineItem.variant_id}`);
+
+      // Get customer email
+      const customerEmail = order.email || order.customer?.email;
+      if (!customerEmail) {
+        console.log(`No customer email found for order ${order.id}`);
+        return {
+          success: false,
+          orderId: order.id,
+          message: 'No customer email found'
+        };
+      }
+
+      // Map Shopify product to LearnWorlds product
+      const learnWorldsProductId = await this.mapShopifyToLearnWorlds(lineItem.product_id, lineItem.variant_id, shopConfig);
+      
+      if (!learnWorldsProductId) {
+        console.log(`No LearnWorlds product mapping found for Shopify product ${lineItem.product_id}`);
+        return {
+          success: false,
+          orderId: order.id,
+          message: 'No LearnWorlds product mapping found'
+        };
+      }
+
+      // Make single API call to unenroll user
+      console.log(`Making unenrollment API call: ${customerEmail} from LearnWorlds product ${learnWorldsProductId}`);
+      const result = await lwApi.unenrollUser(customerEmail, learnWorldsProductId, 'course');
+      
+      console.log(`Successfully unenrolled ${customerEmail} from product ${learnWorldsProductId}`);
+      
+      return {
+        success: true,
+        orderId: order.id,
+        email: customerEmail,
+        productId: learnWorldsProductId,
+        result
+      };
 
     } catch (error) {
       console.error(`Error processing refund webhook: ${error.message}`);
@@ -126,57 +104,23 @@ class WebhookHandler {
     }
   }
 
-  // Map Shopify products to LearnWorlds products
+  // Simple mapping function - direct lookup without API calls
   static async mapShopifyToLearnWorlds(shopifyProductId, shopifyVariantId, shopConfig) {
-    // This is a placeholder implementation
-    // You should implement your own mapping logic based on your product structure
-    // This could be stored in your database or configuration
+    // Simple direct mapping from configuration
+    const productMapping = shopConfig.productMapping || {};
     
-    console.log(`Mapping Shopify product ${shopifyProductId}, variant ${shopifyVariantId}`);
-    console.log(`Available mappings:`, JSON.stringify(shopConfig.productMapping, null, 2));
-    
-    try {
-      const shopify = new Shopify.Clients.Rest(shopConfig.shop, shopConfig.accessToken);
-      
-      // Get product details
-      const productResponse = await shopify.get({
-        path: `products/${shopifyProductId}`
-      });
-      
-      const product = productResponse.body.product;
-      
-      // Look for LearnWorlds product ID in product tags
-      const learnWorldsTag = product.tags?.split(',').find(tag => 
-        tag.trim().startsWith('learnworlds:')
-      );
-      
-      if (learnWorldsTag) {
-        const mappedId = learnWorldsTag.trim().split(':')[1];
-        console.log(`Found product mapping via tag: ${shopifyProductId} -> ${mappedId}`);
-        return mappedId;
-      }
-      
-      // Look for LearnWorlds product ID in metafields
-      if (product.metafields) {
-        const learnWorldsMetafield = product.metafields.find(mf => 
-          mf.key === 'learnworlds_product_id'
-        );
-        
-        if (learnWorldsMetafield) {
-          console.log(`Found product mapping via metafield: ${shopifyProductId} -> ${learnWorldsMetafield.value}`);
-          return learnWorldsMetafield.value;
-        }
-      }
-      
-      // Default mapping based on product title (not recommended for production)
-      // This is just for demonstration
-      console.warn(`No LearnWorlds mapping found for Shopify product ${shopifyProductId}`);
-      return null;
-      
-    } catch (error) {
-      console.error(`Error mapping Shopify to LearnWorlds: ${error.message}`);
-      return null;
+    // Try product ID mapping first
+    if (productMapping[shopifyProductId]) {
+      return productMapping[shopifyProductId];
     }
+    
+    // Try variant ID mapping if no product mapping found
+    if (productMapping[shopifyVariantId]) {
+      return productMapping[shopifyVariantId];
+    }
+    
+    // No mapping found
+    return null;
   }
 
   // Process incoming webhook
