@@ -230,7 +230,7 @@ class WebhookHandler {
 
       // Cancellation handling is similar to refund
       // You might want to implement different logic based on your business rules
-      return await this.handleOrderRefund(topic, shop, body);
+      return await this.handleOrderRefund('orders/cancelled', shop, body);
       
     } catch (error) {
       console.error(`Error processing cancellation webhook: ${error.message}`);
