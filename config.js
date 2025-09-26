@@ -71,9 +71,25 @@ const Shop = {
 };
 
 const WebhookEvent = {
+  findOne: ({ where }) => {
+    const events = Array.from(store.webhookEvents.values());
+    const event = events.find(e => e.webhookId === where.webhookId);
+    return Promise.resolve(event || null);
+  },
   findAll: ({ where, order, limit } = {}) => {
     const events = store.findWebhookEvents(where);
     return Promise.resolve(events.slice(0, limit || events.length));
+  },
+  create: (data) => {
+    return store.createWebhookEvent(data);
+  },
+  update: (data) => {
+    const event = store.webhookEvents.get(data.webhookId);
+    if (event) {
+      Object.assign(event, data);
+      store.webhookEvents.set(data.webhookId, event);
+    }
+    return Promise.resolve(event);
   }
 };
 

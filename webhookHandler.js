@@ -180,7 +180,8 @@ class WebhookHandler {
       }
 
       // Update webhook status
-      await webhookEvent.update({
+      await WebhookEvent.update({
+        webhookId: webhookEvent.webhookId,
         status: 'completed',
         orderId: result.orderId
       });
@@ -192,7 +193,8 @@ class WebhookHandler {
 
     } catch (error) {
       // Update webhook status with error
-      await webhookEvent.update({
+      await WebhookEvent.update({
+        webhookId: webhookEvent.webhookId,
         status: 'failed',
         errorMessage: error.message
       });
