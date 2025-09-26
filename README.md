@@ -1,16 +1,87 @@
 # Shopify-LearnWorlds Integration
 
-A comprehensive Shopify app that integrates with LearnWorlds to automatically unenroll users from courses when orders are refunded or cancelled.
+A production-ready Shopify app that automatically unenrolls customers from LearnWorlds courses when they receive refunds on Shopify. Designed for Vercel deployment with GitHub integration.
 
-## Features
+## 🚀 Production Deployment (Vercel)
 
-- **Automatic Unenrollment**: Automatically unenroll users from LearnWorlds courses when Shopify orders are refunded or cancelled
-- **Webhook Integration**: Secure webhook handlers for Shopify order events
-- **Admin Dashboard**: Beautiful admin interface for managing the integration
-- **User Management**: Manually enroll/unenroll users from courses
-- **Webhook Logs**: Track and monitor all webhook events
-- **Multi-shop Support**: Support for multiple Shopify stores
-- **Vercel Deployment**: Ready for deployment on Vercel with GitHub integration
+### Quick Start
+
+1. **Deploy to Vercel**
+   ```bash
+   # Push to GitHub first
+   git add .
+   git commit -m "Production deployment ready"
+   git push origin main
+   
+   # Then connect to Vercel dashboard
+   ```
+
+2. **Configure Environment Variables** in Vercel dashboard:
+   ```bash
+   # Required
+   SHOPIFY_API_KEY=your_shopify_api_key
+   SHOPIFY_API_SECRET=your_shopify_api_secret
+   SHOPIFY_APP_URL=https://your-app.vercel.app
+   SHOPIFY_SHOP_DOMAINS=securitymasterclasses.myshopify.com,securityexcellence.myshopify.com
+   
+   LEARNWORLDS_API_BASE=https://your-school.learnworlds.com/admin/api/v2
+   LEARNWORLDS_CLIENT_ID=your_client_id
+   LEARNWORLDS_AUTH_TOKEN=your_auth_token
+   
+   JWT_SECRET=your_jwt_secret_key
+   NODE_ENV=production
+   
+   # Product Mappings (JSON format)
+   PRODUCT_MAPPINGS={"1822":"pro_bundle_123","12345":"basic_course_456"}
+   ```
+
+3. **Configure Shopify Webhooks** in your Shopify admin:
+   - `https://your-app.vercel.app/webhook/orders/refunded`
+   - `https://your-app.vercel.app/webhook/orders/partially_refunded`
+   - `https://your-app.vercel.app/webhook/orders/cancelled`
+
+## 📋 Environment Variables Reference
+
+| Variable | Description | Required | Example |
+|----------|-------------|----------|---------|
+| `SHOPIFY_API_KEY` | Shopify API key | ✅ | `abc123` |
+| `SHOPIFY_API_SECRET` | Shopify API secret | ✅ | `def456` |
+| `SHOPIFY_APP_URL` | Your app URL | ✅ | `https://app.vercel.app` |
+| `SHOPIFY_SHOP_DOMAINS` | Comma-separated shop domains | ✅ | `shop1.myshopify.com,shop2.myshopify.com` |
+| `LEARNWORLDS_API_BASE` | LearnWorlds API base URL | ✅ | `https://school.learnworlds.com/admin/api/v2` |
+| `LEARNWORLDS_CLIENT_ID` | LearnWorlds client ID | ✅ | `xyz789` |
+| `LEARNWORLDS_AUTH_TOKEN` | LearnWorlds auth token | ✅ | `token123` |
+| `PRODUCT_MAPPINGS` | Global product mappings (JSON) | ✅ | `{"123":"course_123"}` |
+| `SKIP_WEBHOOK_VERIFICATION` | Skip webhook verification | ❌ | `false` (recommended) |
+| `JWT_SECRET` | JWT secret key | ✅ | `secret-key` |
+| `NODE_ENV` | Environment | ✅ | `production` |
+
+## 🎯 Features
+
+- **🔄 Automatic Unenrollment**: Processes Shopify refunds and cancellations
+- **🔒 Secure Webhooks**: HMAC signature verification (production-ready)
+- **📊 Comprehensive Logging**: Detailed webhook processing logs
+- **🏪 Multi-Shop Support**: Handle multiple Shopify stores
+- **⚙️ Environment-Based Configuration**: No static data, all from env vars
+- **🚀 Production Ready**: Vercel-optimized with proper error handling
+
+## 📊 Product Mapping Configuration
+
+### JSON Format (Recommended)
+```bash
+PRODUCT_MAPPINGS={"shopify_product_id":"learnworlds_course_id"}
+```
+
+### Mapping Types Supported
+- **Product ID**: `"1822":"pro_bundle_123"`
+- **SKU**: `"PRO-BUNDLE-001":"pro_bundle_123"`
+- **Product Title**: `"Pro Bundle":"pro_bundle_123"`
+
+### Shop-Specific Mappings
+```bash
+PRODUCT_MAPPINGS_SECURITYMASTERCLASSES_MYSHOPIFY_COM={"1822":"pro_bundle_123"}
+PRODUCT_MAPPINGS_SECURITYEXCELLENCE_MYSHOPIFY_COM={"1822":"pro_bundle_123"}
+```
 
 ## Installation
 
