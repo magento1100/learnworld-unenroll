@@ -152,7 +152,7 @@ class WebhookHandler {
     console.log(`Processing webhook: ${topic} for shop ${shop}`);
     
     // Verify webhook signature (skip verification in development mode for testing)
-    if (process.env.NODE_ENV !== 'development' || !process.env.SKIP_WEBHOOK_VERIFICATION) {
+    if (process.env.NODE_ENV !== 'development' && !process.env.SKIP_WEBHOOK_VERIFICATION) {
       if (!this.verifyWebhookSignature(body, signature, secret)) {
         console.log(`Webhook signature verification failed`);
         throw new Error('Invalid webhook signature');
