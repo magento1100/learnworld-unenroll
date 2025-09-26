@@ -28,6 +28,35 @@ class LearnWorldsAPI {
     }
   }
 
+  // Create a new user
+  async createUser(email, username = null, password = null) {
+    try {
+      console.log(`LearnWorlds API: Creating user ${email}`);
+      
+      const data = {
+        email,
+        username: username || email.split('@')[0],
+        password: password || Math.random().toString(36).slice(-8),
+        status: 'active'
+      };
+      
+      console.log(`API Request: POST /users with data:`, data);
+      
+      const response = await this.client.post('/users', data);
+      
+      console.log(`LearnWorlds API: User created successfully`, response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`LearnWorlds API User Creation Error:`, {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      throw new Error(`Failed to create user: ${error.message}`);
+    }
+  }
+
   // Get user's assigned courses
   async getUserCourses(email) {
     try {
@@ -52,13 +81,37 @@ class LearnWorldsAPI {
   async unenrollUser(email, productId, productType) {
     try {
       console.log(`LearnWorlds API: Attempting to unenroll ${email} from ${productType} ${productId}`);
-      console.log(`API Request: DELETE /users/${encodeURIComponent(email)}/enrollment`);
-      console.log(`Request data:`, { productId, productType });
+      
+      // First, get the user to find their ID
+      const user = await this.getUser(email);
+      if (!user) {
+        console.log(`User ${email} not found`);
+        return { 
+          success: true, 
+          message: 'User not found in LearnWorlds',
+          userNotFound: true 
+        };
+      }
+      
+      // Get user's current enrollments to find the enrollment ID
+      const userCourses = await this.getUserCourses(email);
+      const enrollment = userCourses?.data?.find(course => 
+        course.id === productId || course.productId === productId
+      );
+      
+      if (!enrollment) {
+        console.log(`User ${email} is not enrolled in ${productType} ${productId}`);
+        return { 
+          success: true, 
+          message: 'User not enrolled in this product',
+          alreadyUnenrolled: true 
+        };
+      }
+      
+      console.log(`API Request: DELETE /enrollments/${enrollment.id}`);
       console.log(`API Config:`, { baseURL: this.config.baseURL, clientId: this.config.clientId });
       
-      const response = await this.client.delete(`/users/${encodeURIComponent(email)}/enrollment`, {
-        data: { productId, productType }
-      });
+      const response = await this.client.delete(`/enrollments/${enrollment.id}`);
       
       console.log(`LearnWorlds API: Unenrollment successful`, response.data);
       return response.data;
@@ -71,28 +124,8 @@ class LearnWorldsAPI {
         url: error.config?.url
       });
       
-      // Handle specific error cases
       if (error.response?.status === 404) {
-        // Check if user is enrolled first
-        try {
-          const userProducts = await this.getUserProducts(email);
-          const isEnrolled = userProducts?.data?.some(p => 
-            p.id === productId || p.productId === productId
-          );
-          
-          if (!isEnrolled) {
-            console.log(`User ${email} is not enrolled in ${productType} ${productId}`);
-            return { 
-              success: true, 
-              message: 'User not enrolled in this product',
-              alreadyUnenrolled: true 
-            };
-          }
-        } catch (checkError) {
-          console.log(`Could not verify enrollment status: ${checkError.message}`);
-        }
-        
-        throw new Error(`LearnWorlds API endpoint not found. User may not exist or endpoint is incorrect.`);
+        throw new Error(`LearnWorlds API endpoint not found. User may not exist or enrollment not found.`);
       }
       
       throw new Error(`Failed to unenroll user: ${error.message}`);
@@ -102,16 +135,41 @@ class LearnWorldsAPI {
   // Enroll user in a product
   async enrollUser(email, productId, productType, price = 0, sendEmail = true) {
     try {
+      console.log(`LearnWorlds API: Attempting to enroll ${email} in ${productType} ${productId}`);
+      
+      // First, get the user to find their ID, or create if doesn't exist
+      let user = await this.getUser(email);
+      if (!user) {
+        console.log(`User ${email} not found, creating user first`);
+        user = await this.createUser(email);
+      }
+      
+      console.log(`API Request: POST /enrollments`);
+      
       const data = {
-        productId,
-        productType,
-        justification: 'Shopify order enrollment',
+        user_id: user.id,
+        course_id: productType === 'course' ? productId : undefined,
+        bundle_id: productType === 'bundle' ? productId : undefined,
         price,
-        send_enrollment_email: sendEmail
+        send_enrollment_email: sendEmail,
+        justification: 'Shopify order enrollment'
       };
-      const response = await this.client.post(`/users/${encodeURIComponent(email)}/enrollment`, data);
+      
+      console.log(`Request data:`, data);
+      console.log(`API Config:`, { baseURL: this.config.baseURL, clientId: this.config.clientId });
+      
+      const response = await this.client.post('/enrollments', data);
+      
+      console.log(`LearnWorlds API: Enrollment successful`, response.data);
       return response.data;
     } catch (error) {
+      console.error(`LearnWorlds API Enrollment Error:`, {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        url: error.config?.url
+      });
       throw new Error(`Failed to enroll user: ${error.message}`);
     }
   }

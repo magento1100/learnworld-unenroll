@@ -61,8 +61,16 @@ class InMemoryStore {
   
   // Shop methods
   async upsertShop(shopData) {
-    this.shops.set(shopData.shop, shopData);
-    return shopData;
+    // Flatten the learnworlds configuration for compatibility with server.js
+    const flattenedData = {
+      ...shopData,
+      learnworldsBaseUrl: shopData.learnworlds?.baseURL || shopData.learnworldsBaseUrl,
+      learnworldsClientId: shopData.learnworlds?.clientId || shopData.learnworldsClientId,
+      learnworldsAuthToken: shopData.learnworlds?.authToken || shopData.learnworldsAuthToken
+    };
+    
+    this.shops.set(shopData.shop, flattenedData);
+    return flattenedData;
   }
   
   async findShop(shop) {
