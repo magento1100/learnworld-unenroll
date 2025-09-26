@@ -341,6 +341,16 @@
                 <strong>Integration Status:</strong> <span id="integrationStatus">Checking...</span>
             </div>
 
+            <h3>Webhook Testing</h3>
+            <div class="config-section">
+                <p>Test your unenrollment webhook integration:</p>
+                <div class="btn-group">
+                    <button class="btn btn-danger" onclick="testOrderRefunded()">Test Order Refunded (Unenroll)</button>
+                    <button class="btn btn-warning" onclick="testOrderCancelled()">Test Order Cancelled (Unenroll)</button>
+                </div>
+                <div id="testResults" style="margin-top: 20px;"></div>
+            </div>
+
             <h3>Recent Activity</h3>
             <div id="recentActivity">
                 <div class="loading">
@@ -733,6 +743,113 @@
         function refreshConfiguration() {
             loadConfiguration();
             alert('Configuration refreshed!');
+        }
+
+        // Webhook testing functions
+        async function testWebhook(topic, testData) {
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = '<div class="loading"><div class="spinner"></div>Sending webhook...</div>';
+            
+            try {
+                // Use the correct webhook endpoint path
+                const action = topic.replace('orders/', '');
+                const response = await fetch(`/webhooks/orders/${action}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Shopify-Topic': topic,
+                        'X-Shopify-Shop-Domain': shop,
+                        'X-Shopify-Hmac-Sha256': 'test-signature'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.processed) {
+                    resultsDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <strong>✅ Webhook Test Successful!</strong><br>
+                            Action: UNENROLLED<br>
+                            Order ID: ${result.result.orderId}<br>
+                            Email: ${result.result.email}<br>
+                            Product: ${result.result.productId}<br>
+                            ${result.result.action ? `Action: ${result.result.action}` : ''}
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `
+                        <div class="alert alert-info">
+                            <strong>ℹ️ Webhook Processed</strong><br>
+                            ${result.reason || 'Webhook was processed but no action was taken'}
+                        </div>
+                    `;
+                }
+                
+                // Refresh dashboard data
+                loadDashboardData();
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="alert alert-error">
+                        <strong>❌ Webhook Test Failed!</strong><br>
+                        Error: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        function testOrderRefunded() {
+            const testData = {
+                id: 1823,
+                order: {
+                    id: 1823,
+                    email: 'test.student@example.com',
+                    customer: {
+                        email: 'test.student@example.com',
+                        first_name: 'Test',
+                        last_name: 'Student'
+                    },
+                    line_items: [
+                        {
+                            product_id: 1822,
+                            variant_id: 1822,
+                            title: 'Pro Bundle',
+                            price: '99.99',
+                            quantity: 1
+                        }
+                    ],
+                    financial_status: 'refunded',
+                    created_at: new Date().toISOString()
+                }
+            };
+            testWebhook('orders/refunded', testData);
+        }
+
+        function testOrderCancelled() {
+            const testData = {
+                id: 1824,
+                email: 'test.student2@example.com',
+                customer: {
+                    email: 'test.student2@example.com',
+                    first_name: 'Test2',
+                    last_name: 'Student2'
+                },
+                line_items: [
+                    {
+                        product_id: 1822,
+                        variant_id: 1822,
+                        title: 'Pro Bundle',
+                        price: '99.99',
+                        quantity: 1
+                    }
+                ],
+                financial_status: 'voided',
+                cancel_reason: 'customer',
+                cancelled_at: new Date().toISOString(),
+                created_at: new Date().toISOString()
+            };
+            testWebhook('orders/cancelled', testData);
         }
 
         // Load dashboard on page load

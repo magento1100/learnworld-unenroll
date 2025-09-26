@@ -51,11 +51,50 @@ class LearnWorldsAPI {
   // Unenroll user from a product
   async unenrollUser(email, productId, productType) {
     try {
+      console.log(`LearnWorlds API: Attempting to unenroll ${email} from ${productType} ${productId}`);
+      console.log(`API Request: DELETE /users/${encodeURIComponent(email)}/enrollment`);
+      console.log(`Request data:`, { productId, productType });
+      console.log(`API Config:`, { baseURL: this.config.baseURL, clientId: this.config.clientId });
+      
       const response = await this.client.delete(`/users/${encodeURIComponent(email)}/enrollment`, {
         data: { productId, productType }
       });
+      
+      console.log(`LearnWorlds API: Unenrollment successful`, response.data);
       return response.data;
     } catch (error) {
+      console.error(`LearnWorlds API Error:`, {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+        url: error.config?.url
+      });
+      
+      // Handle specific error cases
+      if (error.response?.status === 404) {
+        // Check if user is enrolled first
+        try {
+          const userProducts = await this.getUserProducts(email);
+          const isEnrolled = userProducts?.data?.some(p => 
+            p.id === productId || p.productId === productId
+          );
+          
+          if (!isEnrolled) {
+            console.log(`User ${email} is not enrolled in ${productType} ${productId}`);
+            return { 
+              success: true, 
+              message: 'User not enrolled in this product',
+              alreadyUnenrolled: true 
+            };
+          }
+        } catch (checkError) {
+          console.log(`Could not verify enrollment status: ${checkError.message}`);
+        }
+        
+        throw new Error(`LearnWorlds API endpoint not found. User may not exist or endpoint is incorrect.`);
+      }
+      
       throw new Error(`Failed to unenroll user: ${error.message}`);
     }
   }

@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const { shopifyConfig, Shop, WebhookEvent } = require('./config');
 const WebhookHandler = require('./webhookHandler');
 const LearnWorldsAPI = require('./learnworlds');
+const { loadConfiguration } = require('./load-config');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -22,6 +23,9 @@ app.use(express.urlencoded({ extended: true }));
 async function initializeStorage() {
   try {
     console.log('In-memory storage initialized');
+    
+    // Load default shop configuration for testing
+    await loadConfiguration();
   } catch (error) {
     console.error('Storage initialization failed:', error);
     process.exit(1);
@@ -148,25 +152,23 @@ app.post('/webhooks/orders/:action', async (req, res) => {
       return res.status(400).send('Missing required headers');
     }
 
-    // Get shop configuration - use default if not found
+    // Get shop configuration
     let shopConfig = await Shop.findOne({ where: { shop } });
     
     if (!shopConfig) {
-      // Create default shop configuration for testing
-      console.log(`Creating default shop configuration for ${shop}`);
-      shopConfig = {
-        shop: shop,
-        isActive: true,
-        learnworlds: {
-          baseURL: process.env.LEARNWORLDS_API_BASE || 'https://api.learnworlds.com',
-          clientId: process.env.LEARNWORLDS_CLIENT_ID,
-          authToken: process.env.LEARNWORLDS_AUTH_TOKEN
-        },
-        productMapping: {} // Add your product mappings here
-      };
-      
-      // Save the default configuration
-      await Shop.upsert(shopConfig);
+      console.log(`No shop configuration found for ${shop} - webhook cannot be processed`);
+      return res.status(404).json({ 
+        error: 'Shop configuration not found',
+        message: 'Please configure your shop settings first'
+      });
+    }
+    
+    if (!shopConfig.isActive) {
+      console.log(`Shop ${shop} is inactive - webhook cannot be processed`);
+      return res.status(403).json({ 
+        error: 'Shop is inactive',
+        message: 'Shop configuration is disabled'
+      });
     }
 
     // Process webhook

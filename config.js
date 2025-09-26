@@ -17,6 +17,41 @@ const learnworldsConfig = {
   authToken: process.env.LEARNWORLDS_AUTH_TOKEN
 };
 
+// Load configuration function
+async function loadConfiguration() {
+  const defaultShopConfig = {
+    shop: 'securitymasterclasses.myshopify.com',
+    isActive: true,
+    learnworlds: {
+      baseURL: process.env.LEARNWORLDS_API_BASE || 'https://securitymasterclasses.securityexcellence.net/admin/api/v2',
+      clientId: process.env.LEARNWORLDS_CLIENT_ID || '64facb2d6072346ff30ed226',
+      authToken: process.env.LEARNWORLDS_AUTH_TOKEN || 'O4EwphUJmAjwegMMAxMYGZBpeewtpxF2PXrAv8yX'
+    },
+    productMapping: {
+      '1822': 'pro_bundle_123',
+      '12345': 'basic_course_456',
+      '67890': 'premium_bundle_789',
+      'PRO-BUNDLE-001': 'pro_bundle_123',
+      'BASIC-COURSE-001': 'basic_course_456',
+      'PREMIUM-BUNDLE-001': 'premium_bundle_789',
+      'Pro Bundle': 'pro_bundle_123',
+      'Basic Course': 'basic_course_456',
+      'Premium Bundle': 'premium_bundle_789'
+    }
+  };
+
+  // Check if configuration already exists
+  const existingConfig = await Shop.findOne({ where: { shop: defaultShopConfig.shop } });
+  
+  if (existingConfig) {
+    return existingConfig;
+  }
+  
+  // Create the configuration
+  await Shop.upsert(defaultShopConfig);
+  return defaultShopConfig;
+}
+
 // Simple in-memory storage for serverless environment
 class InMemoryStore {
   constructor() {
@@ -99,4 +134,5 @@ module.exports = {
   sequelize,
   Shop,
   WebhookEvent,
+  loadConfiguration,
 };

@@ -24,7 +24,12 @@ class WebhookHandler {
   static async handleOrderRefund(topic, shop, body) {
     try {
       const refundData = JSON.parse(body);
-      const order = refundData.order;
+      // Handle both direct order data and refund data with order property
+      const order = refundData.order || refundData;
+      
+      if (!order || !order.id) {
+        throw new Error('Invalid refund data: missing order information');
+      }
       
       console.log(`Processing refund for order ${order.id} from shop ${shop}`);
       console.log(`Refund data:`, JSON.stringify(refundData, null, 2));
@@ -95,6 +100,8 @@ class WebhookHandler {
     }
   }
 
+
+
   // Process order cancellation webhook
   static async handleOrderCancellation(topic, shop, body) {
     try {
@@ -116,18 +123,26 @@ class WebhookHandler {
   // Simple mapping function - direct lookup without API calls
   static async mapShopifyToLearnWorlds(shopifyProductId, shopifyVariantId, shopConfig) {
     // Simple direct mapping from configuration
+    console.log(`Mapping function - shopConfig.productMapping:`, JSON.stringify(shopConfig.productMapping, null, 2));
+    console.log(`shopConfig keys:`, Object.keys(shopConfig));
+    
     const productMapping = shopConfig.productMapping || {};
+    console.log(`Product mapping object:`, JSON.stringify(productMapping, null, 2));
+    console.log(`Looking for product ID: ${shopifyProductId}, variant ID: ${shopifyVariantId}`);
     
     // Try product ID mapping first
     if (productMapping[shopifyProductId]) {
+      console.log(`Found mapping for product ID ${shopifyProductId}: ${productMapping[shopifyProductId]}`);
       return productMapping[shopifyProductId];
     }
     
     // Try variant ID mapping if no product mapping found
     if (productMapping[shopifyVariantId]) {
+      console.log(`Found mapping for variant ID ${shopifyVariantId}: ${productMapping[shopifyVariantId]}`);
       return productMapping[shopifyVariantId];
     }
     
+    console.log(`No mapping found for product ID ${shopifyProductId} or variant ID ${shopifyVariantId}`);
     // No mapping found
     return null;
   }
@@ -168,6 +183,7 @@ class WebhookHandler {
       let result;
       
       switch (topic) {
+
         case 'orders/partially_refunded':
         case 'orders/refunded':
           result = await this.handleOrderRefund(topic, shop, body);
